@@ -10,7 +10,17 @@ void setup() {
 }
 
 void loop() {
-  // État allumé et éteint
+
+  //allumeEteint();
+  //variationIntensite();
+  //clignotement();
+
+}
+
+// État allumé et éteint
+
+void allumeEteint(){
+
   Serial.print("Etat: Allume - ");
   Serial.print(etd);
   Serial.println();
@@ -18,8 +28,14 @@ void loop() {
   delay(300);
   digitalWrite(led, HIGH);
   delay(2000);
+  digitalWrite(led, LOW);
+  delay(1000);
+}
 
-  // État variation d'intensité
+// État variation d'intensité
+
+void variationIntensite(){
+
   Serial.print("Etat: Varie - ");
   Serial.print(etd);
   Serial.println();
@@ -29,16 +45,21 @@ void loop() {
     fadeAmount = -fadeAmount;
   }
   delay(2048);
+}
 
-  // État clignotement
+// État clignotement
+
+void clignotement(){
+
   Serial.print("Etat: Clignotement - ");
   Serial.print(etd);
   Serial.println();
-  for(int i = 0; i < 1; i++){
+  delay(1000);
+  for(int i = 0; i < 2; i++){
     digitalWrite(led, HIGH);
     delay(350);
     digitalWrite(led, LOW);
     delay(350);
   }
-  
 }
+
