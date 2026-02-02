@@ -1,7 +1,5 @@
 const int led = 13;
 const long etd = 2449427;
-int brightness = 255;
-int fadeAmount = -5;
 
 void setup() {
   // put your setup code here, to run once:
@@ -11,10 +9,9 @@ void setup() {
 
 void loop() {
 
-  //allumeEteint();
-  //variationIntensite();
-  //clignotement();
-
+  allumeEteint();
+  variationIntensite();
+  clignotement();
 }
 
 // État allumé et éteint
@@ -22,8 +19,8 @@ void loop() {
 void allumeEteint(){
 
   Serial.print("Etat: Allume - ");
-  Serial.print(etd);
-  Serial.println();
+  Serial.println(etd);
+  //delay(1000);
   digitalWrite(led, LOW);
   delay(300);
   digitalWrite(led, HIGH);
@@ -37,25 +34,24 @@ void allumeEteint(){
 void variationIntensite(){
 
   Serial.print("Etat: Varie - ");
-  Serial.print(etd);
-  Serial.println();
-  analogWrite(led, brightness);
-  brightness = brightness + fadeAmount;
-  if(brightness <= 0 || brightness >= 255){
-    fadeAmount = -fadeAmount;
+  Serial.println(etd);
+  //delay(1000);
+  for(int i = 255; i >= 0; i--){      // etd = 2449427;
+    analogWrite(led, i);
+    delay(8);     // de 0 à 255 on a 256 valeurs, donc on a (2048 / 256) = 8;
   }
-  delay(2048);
 }
 
 // État clignotement
 
 void clignotement(){
 
+  int nbClignotements = 1;      // PLAFOND.MATH(2/2) = 1
+
   Serial.print("Etat: Clignotement - ");
-  Serial.print(etd);
-  Serial.println();
-  delay(1000);
-  for(int i = 0; i < 2; i++){
+  Serial.println(etd);
+  //delay(1000);
+  for(int i = 0; i < nbClignotements; i++){      
     digitalWrite(led, HIGH);
     delay(350);
     digitalWrite(led, LOW);
