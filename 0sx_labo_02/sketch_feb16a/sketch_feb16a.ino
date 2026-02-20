@@ -9,11 +9,13 @@ int lastButtonState = HIGH;
 int buttonState;
 
 void setup() {
+
   Serial.begin(9600);
   for (int i = 0; i < 4; i++){
     pinMode(ledPins[i], OUTPUT);
   }
   pinMode(bouton, INPUT_PULLUP);
+
 }
 
 void loop() {
@@ -55,12 +57,12 @@ void showLevel(int converted_value, int pourcentage){           // N.A: 2449427 
 
 void printLeds(int pourcentage){          // N.A: 2449427       dernier chiffre(impair): 7
 
-    if (pourcentage <= 25){
+  if (pourcentage <= 25){
     digitalWrite(ledPins[0], HIGH);
     digitalWrite(ledPins[1], LOW);
     digitalWrite(ledPins[2], LOW);
     digitalWrite(ledPins[3], LOW);
-    }
+  }
   else if(pourcentage <= 50){
     digitalWrite(ledPins[0], HIGH);
     digitalWrite(ledPins[1], HIGH);
