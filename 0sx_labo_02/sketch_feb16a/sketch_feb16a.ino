@@ -27,7 +27,7 @@ void loop() {
 }
 
 
-void showLevel(int converted_value, int pourcentage){
+void showLevel(int converted_value, int pourcentage){           // N.A: 2449427      avant dernier chiffre(pair): 2
 
   int reading = digitalRead(bouton);
 
@@ -53,7 +53,7 @@ void showLevel(int converted_value, int pourcentage){
   lastButtonState = reading;
 }
 
-void printLeds(int pourcentage){
+void printLeds(int pourcentage){          // N.A: 2449427       dernier chiffre(impair): 7
 
     if (pourcentage <= 25){
     digitalWrite(ledPins[0], HIGH);
