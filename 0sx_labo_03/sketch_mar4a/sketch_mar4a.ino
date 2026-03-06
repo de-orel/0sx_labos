@@ -24,9 +24,10 @@ void setup() {
   pinMode(bouton, INPUT_PULLUP);
 }
 
-void projecteurNocturne(){
+int projecteurNocturne(){
   int value = analogRead(photoresistance);
   int mappedValue = map(value, 0, 1023, 0, 100);
+  int numState = 0;
   String state = "";
 
   if(mappedValue < 30){
@@ -37,6 +38,7 @@ void projecteurNocturne(){
     if(millis() - debutChronoLow >= delay){
       digitalWrite(LED, HIGH);
       state = "ON";
+      numState = 1;
     }
     debutChronoHigh = 0;
 
@@ -48,19 +50,21 @@ void projecteurNocturne(){
     if(millis() - debutChronoHigh >= delay){
       digitalWrite(LED, LOW);
       state = "OFF";
+      numState = 0;
     }
     debutChronoLow = 0;
-
-    lcd.setCursor(0, 0);
-    lcd.print("LUMI: ")
-    lcd.print(mappedValue);
-    lcd.print("%  ");
-
-    lcd.setCursor(0, 1);
-    lcd.print("LIGHT: ")
-    lcd.print(state);
-    lcd.print(" ");
   }
+  lcd.setCursor(0, 0);
+  lcd.print("LUMI: ")
+  lcd.print(mappedValue);
+  lcd.print("%  ");
+
+  lcd.setCursor(0, 1);
+  lcd.print("LIGHT: ")
+  lcd.print(state);
+  lcd.print(" ");
+
+  return numState;
 }
 
 void joystickControl(){
@@ -135,17 +139,18 @@ void BoutonChanger(){
 
 void serialTransmission(){
   int delay = 100;
-
+  int valSys = projecteurNocturne();
+  
   int currentTime = millis();
   if(currentTime - previousTime >= delay){
     Serial.print("etd" + String(etd));
-    Serial.print("x:" + String(xValue) + ",y:" + String(yValue));
+    Serial.print("x:" + String(xValue) + ",y:" + String(yValue) + ",sys:" + String(valSys));
   }
 }
 
 
 void loop() {
-  
+
   BoutonChanger();
   serialTransmission();
 }
