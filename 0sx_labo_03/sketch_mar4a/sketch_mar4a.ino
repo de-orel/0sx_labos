@@ -1,30 +1,41 @@
+#include <Wire.h>
+#include <LCD_I2C.h>
+#include <LiquidCrystal_I2C.h>
+
 const int photoresistance = A0;
 const int LED = 8;
 
 // projecteurNocturne
-int debutChronoLow = 0;
-int debutChronoHigh = 0;
-const int delay = 5000;
+unsigned long debutChronoLow = 0;
+unsigned long debutChronoHigh = 0;
 // joystickControl
-const int xPin = A1;
-const int yPin = A2;
-const int bouton = 2;
+const int xPin = A1, yPin = A2, bouton = 2;
 int xValue;
 int yValue;
-float hauteur = 0.0;
-float angle = 0.0;
 unsigned long lastUpdate = 0;
 // serialTransmission
 const long etd = 2449427;
 int previousUpdate = 0;
+// pages LCD
+int page = 0;
+
+LCD_I2C lcd(0x27, 16, 2);
+byte special[8] = {B11100, B00100, B01000, B11100, B00111, B00001, B00010, B00100};  // caractère spécial
 
 void setup() {
-  Serial.begin(9600);
+
+  Serial.begin(115200);
   pinMode(LED, OUTPUT);
   pinMode(bouton, INPUT_PULLUP);
+
+  lcd.begin();
+  lcd.backlight();
+  lcd.createChar(0, special);
 }
 
 int projecteurNocturne(){
+
+  const unsigned long  delayy = 5000;
   int value = analogRead(photoresistance);
   int mappedValue = map(value, 0, 1023, 0, 100);
   int numState = 0;
@@ -35,9 +46,9 @@ int projecteurNocturne(){
     if(debutChronoLow == 0){
       debutChronoLow = millis();
     }
-    if(millis() - debutChronoLow >= delay){
+    if(millis() - debutChronoLow >= delayy){
       digitalWrite(LED, HIGH);
-      state = "ON";
+      state = "ON ";
       numState = 1;
     }
     debutChronoHigh = 0;
@@ -47,42 +58,46 @@ int projecteurNocturne(){
     if(debutChronoHigh == 0){
       debutChronoHigh = millis();
     }
-    if(millis() - debutChronoHigh >= delay){
+    if(millis() - debutChronoHigh >= delayy){
       digitalWrite(LED, LOW);
       state = "OFF";
       numState = 0;
     }
     debutChronoLow = 0;
   }
-  lcd.setCursor(0, 0);
-  lcd.print("LUMI: ")
-  lcd.print(mappedValue);
-  lcd.print("%  ");
+    if(page == 0){
+      lcd.setCursor(0, 0);
+      lcd.print("LUMI: ");
+      lcd.print(mappedValue);
+      lcd.print("%  ");
 
-  lcd.setCursor(0, 1);
-  lcd.print("LIGHT: ")
-  lcd.print(state);
-  lcd.print(" ");
+      lcd.setCursor(0, 1);
+      lcd.print("LIGHT: ");
+      lcd.print(state);
+  }
 
   return numState;
 }
 
 void joystickControl(){
 
-  int boutonValue = digitalRead(bouton)
+  static float hauteur = 0.0;
+  static float angle = 0.0;
+  int boutonValue = digitalRead(bouton);
+
   xValue = analogRead(xPin);
   yValue = analogRead(yPin);
   const int deadzone = 25;
   String position = "CENTER";
 
-  xmappedValue = map(xValue, 0, 1023, -90, 90);
+  int xmappedValue = map(xValue, 0, 1023, -90, 90);
   unsigned long currentTime = millis();
 
   if(currentTime - lastUpdate >= 100){
-    lastUpdated = currentTime;
+    lastUpdate = currentTime;
 
     if(yValue > (512 + deadzone)){
-      hauteur += 1 * 0.1;  // 100ms = 0.1s (on vérifie toutes les 0.1s si y augmente et on ajoute 1m/s * 0.1s = 0.1m)
+      hauteur += 1 * 0.1;  // 100ms = 0.1s (on vérifie toutes les 0.1s si la hauteur augmente et on ajoute 1m/s * 0.1s = 0.1m)
       position = "UP";
     }
     else if(yValue < (512 - deadzone)){
@@ -93,22 +108,22 @@ void joystickControl(){
     if(hauteur < 0) hauteur = 0;
     if(hauteur > 200) hauteur = 200;
 
-    lcd.setCursor(0, 0);
-    lcd.print("ALT: ");
-    lcd.print(hauteur);
-    lcd.print("m  ");
+    if(page == 1){
+      lcd.setCursor(0, 0);
+      lcd.print("ALT: ");
+      lcd.print(hauteur);
+      lcd.print("m  ");
 
-    lcd.setCursor(0, 1);
-    lcd.print("DIR: ");
-    lcd.print(xmappedValue);
-    lcd.print("(G)  ");
-
+      lcd.setCursor(0, 1);
+      lcd.print("DIR: ");
+      lcd.print(xmappedValue);
+      if(xmappedValue < 0)lcd.print("(G)  ");
+      else lcd.print("(D)  ");      
+    }
   }
-
 }
 
-void BoutonChanger(){
-  static int compteur = 0;
+void BoutonChanger(){;
 
   static int etatPrecedent = HIGH;
   static int etat = HIGH; 
@@ -124,35 +139,51 @@ void BoutonChanger(){
   if ((millis() - dernierChangement) > delai && etatPresent != etat) { 
     etat = etatPresent; 
     if(digitalRead(bouton) == 0){
-      if(compteur % 2 == 0){
-        joystickControl();
-        compteur++;
-      }
-      else{
-        projecteurNocturne();
-        compteur++;
-      }
+      page = !page;
+      lcd.clear();
     }
   }
   etatPrecedent = etatPresent;
 }
 
 void serialTransmission(){
-  int delay = 100;
+
+  int delaie = 1000;
   int valSys = projecteurNocturne();
   
   int currentTime = millis();
-  if(currentTime - previousTime >= delay){
+  if(currentTime - previousUpdate >= delaie){
     Serial.print("etd" + String(etd));
     Serial.print("x:" + String(xValue) + ",y:" + String(yValue) + ",sys:" + String(valSys));
+    Serial.println();
   }
 }
 
 
 void loop() {
 
-  BoutonChanger();
-  serialTransmission();
+  const int delai = 3000;
+  unsigned long time = millis();
+  static bool clean = true;
+  if(time <= delai){
+    lcd.setCursor(0, 0);
+    lcd.print("NGUEDIA DEMANOU");
+
+    lcd.setCursor(0, 1);
+    lcd.write(0);
+
+    lcd.setCursor(9, 1);
+    lcd.print("*****27");
+  }else{
+    if(clean){
+     lcd.clear();
+     clean = false; 
+    }
+    projecteurNocturne();
+    joystickControl();
+    BoutonChanger();
+    serialTransmission();
+  }
 }
 
 
