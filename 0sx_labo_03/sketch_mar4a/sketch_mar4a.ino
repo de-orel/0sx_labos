@@ -1,20 +1,20 @@
-#include <Wire.h>
 #include <LCD_I2C.h>
-#include <LiquidCrystal_I2C.h>
 
-const int photoresistance = A0;
+const int PHOTORESISTANCE = A0;
 const int LED = 8;
+const long ETD = 2449427;
 
 // projecteurNocturne
 unsigned long debutChronoLow = 0;
 unsigned long debutChronoHigh = 0;
+
 // joystickControl
 const int xPin = A1, yPin = A2, bouton = 2;
 int xValue;
 int yValue;
 unsigned long lastUpdate = 0;
+
 // serialTransmission
-const long etd = 2449427;
 int previousUpdate = 0;
 // pages LCD
 int page = 0;
@@ -33,16 +33,42 @@ void setup() {
   lcd.createChar(0, special);
 }
 
+void loop() {
+
+  const int delai = 3000;
+  unsigned long time = millis();
+  static bool clean = true;
+  if(time <= delai){
+    lcd.setCursor(0, 0);
+    lcd.print("NGUEDIA DEMANOU");
+
+    lcd.setCursor(0, 1);
+    lcd.write(0);
+
+    lcd.setCursor(9, 1);
+    lcd.print("*****27");
+  }else{
+    if(clean){
+     lcd.clear();
+     clean = false; 
+    }
+    projecteurNocturne();
+    joystickControl();
+    BoutonChanger();
+    serialTransmission();
+  }
+}
+
 int projecteurNocturne(){
 
   const unsigned long  delayy = 5000;
-  int value = analogRead(photoresistance);
+  int value = analogRead(PHOTORESISTANCE);
   int mappedValue = map(value, 0, 1023, 0, 100);
   int numState = 0;
   String state = "";
 
   if(mappedValue < 30){
-
+    
     if(debutChronoLow == 0){
       debutChronoLow = millis();
     }
@@ -82,16 +108,19 @@ int projecteurNocturne(){
 void joystickControl(){
 
   static float hauteur = 0.0;
-  static float angle = 0.0;
+
   int boutonValue = digitalRead(bouton);
 
   xValue = analogRead(xPin);
   yValue = analogRead(yPin);
   const int deadzone = 25;
-  String position = "CENTER";
+  const int deadangle = 2;
+  String position = "CTR";
 
-  int xmappedValue = map(xValue, 0, 1023, -90, 90);
+  int angle = map(xValue, 0, 1023, -90, 90);
   unsigned long currentTime = millis();
+
+  if(angle < 0 + deadangle && angle > 0 - deadangle) angle = 0;
 
   if(currentTime - lastUpdate >= 100){
     lastUpdate = currentTime;
@@ -112,12 +141,14 @@ void joystickControl(){
       lcd.setCursor(0, 0);
       lcd.print("ALT: ");
       lcd.print(hauteur);
-      lcd.print("m  ");
+      lcd.print("m(");
+      lcd.print(position);
+      lcd.print(")   ");
 
       lcd.setCursor(0, 1);
       lcd.print("DIR: ");
-      lcd.print(xmappedValue);
-      if(xmappedValue < 0)lcd.print("(G)  ");
+      lcd.print(angle);
+      if(angle < 0)lcd.print("(G)  ");
       else lcd.print("(D)  ");      
     }
   }
@@ -153,37 +184,14 @@ void serialTransmission(){
   
   int currentTime = millis();
   if(currentTime - previousUpdate >= delaie){
-    Serial.print("etd" + String(etd));
+    previousUpdate = currentTime;
+
+    Serial.print("etd:" + String(ETD));
     Serial.print("x:" + String(xValue) + ",y:" + String(yValue) + ",sys:" + String(valSys));
     Serial.println();
   }
+
 }
 
-
-void loop() {
-
-  const int delai = 3000;
-  unsigned long time = millis();
-  static bool clean = true;
-  if(time <= delai){
-    lcd.setCursor(0, 0);
-    lcd.print("NGUEDIA DEMANOU");
-
-    lcd.setCursor(0, 1);
-    lcd.write(0);
-
-    lcd.setCursor(9, 1);
-    lcd.print("*****27");
-  }else{
-    if(clean){
-     lcd.clear();
-     clean = false; 
-    }
-    projecteurNocturne();
-    joystickControl();
-    BoutonChanger();
-    serialTransmission();
-  }
-}
 
 
