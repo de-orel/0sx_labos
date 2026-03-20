@@ -65,7 +65,10 @@ int projecteurNocturne(){
   int value = analogRead(PHOTORESISTANCE);
   int mappedValue = map(value, 0, 1023, 0, 100);
   int numState = 0;
+
+  static bool start = true;  // Pour afficher l'état à OFF qu'au départ sans faire de verification pendant 5 secondes.
   String state = "";
+  if(start) state = "OFF";
 
   if(mappedValue < 30){
     
@@ -76,6 +79,7 @@ int projecteurNocturne(){
       digitalWrite(LED, HIGH);
       state = "ON ";
       numState = 1;
+      start = false;
     }
     debutChronoHigh = 0;
 
@@ -88,19 +92,20 @@ int projecteurNocturne(){
       digitalWrite(LED, LOW);
       state = "OFF";
       numState = 0;
+      start = false;
     }
     debutChronoLow = 0;
   }
-    if(page == 0){
-      lcd.setCursor(0, 0);
-      lcd.print("LUMI: ");
-      lcd.print(mappedValue);
-      lcd.print("%  ");
+  if(page == 0){
+    lcd.setCursor(0, 0);
+    lcd.print("LUMI: ");
+    lcd.print(mappedValue);
+    lcd.print("%  ");
 
-      lcd.setCursor(0, 1);
-      lcd.print("LIGHT: ");
-      lcd.print(state);
-  }
+    lcd.setCursor(0, 1);
+    lcd.print("LIGHT: ");
+    lcd.print(state);
+   }
 
   return numState;
 }
