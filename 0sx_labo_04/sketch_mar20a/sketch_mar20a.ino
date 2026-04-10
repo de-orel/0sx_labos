@@ -29,6 +29,7 @@ OneButton buttonOpening(BTN_OPENING, true);
 OneButton buttonEmergency(BTN_EMERGENCY, true);
 
 LCD_I2C lcd(0x27, 16, 2);
+String statue = "";                   // Pour l'affichage du statut de la porte;
 
 void setup() {
 
@@ -60,15 +61,17 @@ void loop() {
     distance = hc.dist();
   }
   autoOpening();
+  printScreen();
 }
 
-unsigned long valid = 0;
 
 void checkDistance(){
+  statue = "FERMEE !    ";
   if(distance > AREA1 && distance <= AREA2){
     state = OPENING;
   }
 }
+
 
 void openDoor(){
 
@@ -83,28 +86,21 @@ void openDoor(){
       state = OPEN;
     }
   }
-  lcd.setCursor(1, 0);
-  lcd.print("OUVERTURE..  ");
+  statue = "OUVERTURE..  ";
 }
 
 void waitDelay(){
 
-  if(millis() - valid >= 1000){
-    valid = millis();
-    lcd.setCursor(1, 1);
-    int timeSecond = (millis() - lastOpening) / 1000.0; 
-    lcd.print(timeSecond);
-  }
+  statue = "OUVERTE !   ";
   if(millis() - lastOpening >= 10000){
     state = CLOSING;
-    lcd.clear();
   }
 }
+
 
 void closeDoor(){
 
   checkDistance();
-
   if(millis() - lastMove >= 15){
     lastMove = millis();
     if(angle > 0){
@@ -115,18 +111,48 @@ void closeDoor(){
       state = CLOSE;
     }
   }
+  statue = "FERMETURE..  ";
+}
+
+
+void openWithButton(){
+
+  if(state != OPENING){
+    state = OPENING;
+  }
+}
+
+
+void emergencybutton(){
+
+  static bool active = true;
+  if(active == true){
+    myServo.detach();
+    active = false;
+    state = EMERGENCY;
+    statue = "!! URGENCE !!";
+  }
+  else if(active == false){
+    myServo.attach(SERVO_PIN);
+    state = CLOSING;
+    active = true;
+  } 
+}
+
+void printScreen(){
+
   lcd.setCursor(1, 0);
-  lcd.print("FERMETURE..  ");
+  lcd.print(statue);
 }
 
 
 void autoOpening(){
-  if(state == EMERGENCY){
-    return;
-  }
-  Serial.println(distance);
-  switch(state){
 
+  if(state == EMERGENCY){
+    return;                           // On arrête tout le système si on est en état d'urgence.
+  }
+
+  switch(state){
     case CLOSE:
       checkDistance();
       break;
@@ -140,30 +166,4 @@ void autoOpening(){
       closeDoor();
       break;
   }
-}
-
-
-void openWithButton(){
-
-  if(state != OPENING){
-    state = OPENING;
-  }
-}
-
-void emergencybutton(){
-
-  static bool active = true;
-  if(active == true){
-    myServo.detach();
-    active = false;
-    state = EMERGENCY;
-    lcd.clear();
-    lcd.setCursor(1, 0);
-    lcd.print("!! URGENCE !!");
-  }
-  else if(active == false){
-    myServo.attach(SERVO_PIN);
-    state = CLOSING;
-    active = true;
-  } 
 }

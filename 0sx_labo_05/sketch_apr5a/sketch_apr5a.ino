@@ -17,7 +17,7 @@ int xValue, yValue;
 int val = 0;
 // Lcd
 LCD_I2C lcd(0x27, 16, 2);
-String state = "", position = "";
+String active = "", position = "";
 
 OneButton buttonEmergency;
 
@@ -30,10 +30,27 @@ void setup() {
   pinMode(INPUT_2, OUTPUT);
   pinMode(JOY_BTN, INPUT_PULLUP);  
   buttonEmergency.setup(EMERG_BTN, INPUT_PULLUP, true);
+  buttonEmergency.attachClick(emergencyStop);
 }
+
+enum Etat{
+  READ,
+  MOVE,
+  FASTNSLOW,
+  EMERGENCY
+};
+Etat state = READ;
 
 void loop() {
   buttonEmergency.tick();
+
+  readAnalog();
+  cloud9();
+}
+
+void readAnalog(){
+  if(yValue > 512 + DEADZONE || yValue < 512 - DEADZONE) state = MOVE;
+  else if(xValue > 512 + DEADZONE || xValue < 512 - DEADZONE) state = FASTNSLOW;
 }
 
 void forwardBackward(){
@@ -51,7 +68,7 @@ void forwardBackward(){
     digitalWrite(INPUT_2, HIGH);
     digitalWrite(LED_1, HIGH);
     active = "OUI"; 
-    postion = "ARRIÈRE"; 
+    postion = "ARRIÈRE";
   }
   else{
     digitalWrite(INPUT_1, LOW);
@@ -60,6 +77,7 @@ void forwardBackward(){
     active = "NON";
     position = "CENTER";
   }
+  screenPrinter();
 }
 
 void speedControl(){
@@ -74,6 +92,8 @@ void speedControl(){
         analogWrite(INPUT_1, val);
         analogWrite(INPUT_2, 0);
         digitalWrite(LED_1, HIGH);
+        active = "OUI";
+        Position = "AVANT";
       }
     }
   }
@@ -85,6 +105,8 @@ void speedControl(){
         analogWrite(INPUT_1, 0);
         analogWrite(INPUT_2, val);
         digitalWrite(LED_1, HIGH);
+        active = "OUI";
+        Position = "ARRIÈRE";
       }  
     }
   }
@@ -92,7 +114,10 @@ void speedControl(){
     digitalWrite(INPUT_1, LOW);
     digitalWrite(INPUT_2, LOW);
     digitalWrite(LED_1, LOW);
-  } 
+    active = "NON";
+    Position = "CENTER";
+  }
+  screenPrinter();
 }
 
 
@@ -122,9 +147,40 @@ void screenPrinter(){
 
     }
   }
-
 }
 
 void emergencyStop(){
+  static bool mustTurnOff = true;
 
+  if(mustTurnOff == true){
+    digitalWrite(INPUT_1, LOW);
+    digitalWrite(INPUT_2, LOW);
+    digitalWrite(LED_2, HIGH);
+    lcd.print(" !! URGENCE !!  ");
+    mustTurnOff = false;
+
+  }
+  else{
+    digitalWrite(LED_2, HIGH);
+    mustTurnOff = true;   
+    state = READ;
+  }
+}
+
+void cloud9(){
+
+  switch(state){
+    case READ:
+      readAnalog();
+      break;
+    case MOVE:
+      forwardBackward();
+      break;
+    case FASTNSLOW:
+      speedControl();
+      break;
+    case EMERGENCY:
+      emergencyStop();
+      break;
+  }
 }
