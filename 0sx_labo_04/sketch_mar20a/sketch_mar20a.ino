@@ -5,7 +5,6 @@
 
 #define TRIGGER_PIN 9
 #define ECHO_PIN 10
-
 #define SERVO_PIN 3
 
 // Objet de type capteur de distance
@@ -19,8 +18,15 @@ unsigned long lastOpening = 0;
 const int BTN_OPENING = 7;
 const int BTN_EMERGENCY = 8;
 
-OneButton buttonOpening;
-OneButton buttonEmergency;
+const float AREA1 = 0;
+const float AREA2 = 30;
+float distance = 0;
+unsigned long lastMove = 0;
+int angle = 10;
+unsigned long lastDate = 0;
+
+OneButton buttonOpening(BTN_OPENING, true);
+OneButton buttonEmergency(BTN_EMERGENCY, true);
 
 LCD_I2C lcd(0x27, 16, 2);
 
@@ -29,101 +35,117 @@ void setup() {
   Serial.begin(9600);
   lcd.begin();
   lcd.backlight();
+  myServo.write(angle);
 
   myServo.attach(SERVO_PIN);
-  buttonOpening.setup(BTN_OPENING, INPUT_PULLUP, true);
-  buttonEmergency.setup(BTN_EMERGENCY, INPUT_PULLUP, true);
-
+  buttonOpening.attachClick(openWithButton);
+  buttonEmergency.attachClick(emergencybutton);
 }
 
 enum Etat{
   CLOSE,
   OPENING,
   OPEN,
-  CLOSING
+  CLOSING,
+  EMERGENCY
 };
 Etat state = CLOSE;
 
 void loop() {
-  autoOpening();
-
   buttonOpening.tick();
   buttonEmergency.tick();
-  openWithButton();
-  emergencybutton();
+
+  if(millis() - lastDate >= 50){
+    lastDate = millis();
+    distance = hc.dist();
+  }
+  autoOpening();
 }
 
+unsigned long valid = 0;
+
+void checkDistance(){
+  if(distance > AREA1 && distance <= AREA2){
+    state = OPENING;
+  }
+}
+
+void openDoor(){
+
+  if(millis() - lastMove >= 15){
+    lastMove = millis();
+    if(angle < 170){
+      angle++;
+      myServo.write(angle);
+    }
+    else{
+      lastOpening = millis();
+      state = OPEN;
+    }
+  }
+  lcd.setCursor(1, 0);
+  lcd.print("OUVERTURE..  ");
+}
+
+void waitDelay(){
+
+  if(millis() - valid >= 1000){
+    valid = millis();
+    lcd.setCursor(1, 1);
+    int timeSecond = (millis() - lastOpening) / 1000.0; 
+    lcd.print(timeSecond);
+  }
+  if(millis() - lastOpening >= 10000){
+    state = CLOSING;
+    lcd.clear();
+  }
+}
+
+void closeDoor(){
+
+  checkDistance();
+
+  if(millis() - lastMove >= 15){
+    lastMove = millis();
+    if(angle > 0){
+      angle--;
+      myServo.write(angle);
+    }
+    else{
+      state = CLOSE;
+    }
+  }
+  lcd.setCursor(1, 0);
+  lcd.print("FERMETURE..  ");
+}
+
+
 void autoOpening(){
-  const float AREA1 = 0;
-  const float AREA2 = 30;
-  float distance = hc.dist();
-  static unsigned long lastMove = 0;
-  static int angle = 10;
-
-  static long valid = 0;
-
+  if(state == EMERGENCY){
+    return;
+  }
   Serial.println(distance);
-
   switch(state){
 
     case CLOSE:
-      if(distance > AREA1 && distance <= AREA2){
-        state = OPENING;
-      }
-      lcd.clear();
-    break;
-
+      checkDistance();
+      break;
     case OPENING:
-      if(millis() - lastMove >= 15){
-        lastMove = millis();
-        if(angle < 170){
-          angle++;
-          myServo.write(angle);
-        }
-        else{
-          lastOpening = millis();
-          state = OPEN;
-        }
-      }
-      lcd.setCursor(1, 0);
-      lcd.print("OUVERTURE..");
-    break;
-
+      openDoor();
+      break;
     case OPEN:
-      if(millis() - valid >= 1000){
-        valid = millis();
-        lcd.setCursor(1, 1);
-        int timeSecond = (millis() - lastOpening) / 1000.0; 
-        lcd.print(timeSecond);
-      }
-
-      if(millis() - lastOpening >= 10000){
-        state = CLOSING;
-        lcd.clear();
-      }
-    break;
-
+      waitDelay();
+      break;
     case CLOSING:
-      if(millis() - lastMove >= 15){
-        lastMove = millis();
-        if(angle > 0){
-          angle--;
-          myServo.write(angle);
-        }
-        else{
-          state = CLOSE;
-        }
-      }
-      lcd.setCursor(1, 0);
-      lcd.print("FERMETURE..");
-    break;
+      closeDoor();
+      break;
   }
 }
 
 
 void openWithButton(){
 
-  if(digitalRead(BTN_OPENING) == 0 && state != OPENING){
+  if(state != OPENING){
     state = OPENING;
   }
 }
@@ -131,17 +153,16 @@ void openWithButton(){
 void emergencybutton(){
 
   static bool active = true;
-
-  if(digitalRead(BTN_EMERGENCY) == 0 && active){
+  if(active == true){
     myServo.detach();
     active = false;
+    state = EMERGENCY;
     lcd.clear();
     lcd.setCursor(1, 0);
     lcd.print("!! URGENCE !!");
   }
-  
-  if(digitalRead(BTN_EMERGENCY) == 0 && !active){
-    myServo.attach(3);
+  else if(active == false){
+    myServo.attach(SERVO_PIN);
     state = CLOSING;
     active = true;
   } 
