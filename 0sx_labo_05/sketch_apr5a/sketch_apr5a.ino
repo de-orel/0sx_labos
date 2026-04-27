@@ -1,186 +1,151 @@
-#include "OneButton.h"
+#include <OneButton.h>
 #include <LCD_I2C.h>
-// Moteur DC
-const int INPUT_1 = 44;
-const int INPUT_2 = 45;
-// Led
-const int LED_1 = 7;
-const int LED_2 = 8;
-// Bouton
-const int EMERG_BTN = 9;
-// joystickControl
-const int X_PIN = A1
-const int Y_PIN = A2
-const int JOY_BTN = 2;
-const int DEADZONE = 25;
-int xValue, yValue;
-int val = 0;
-// Lcd
-LCD_I2C lcd(0x27, 16, 2);
-String active = "", position = "";
+#include "Moteur_dc.h"
 
-OneButton buttonEmergency;
+const int PIN_IN1 = 44, PIN_IN2 = 45;
+const int PIN_LED_MOVE = 9, PIN_LED_EMERGENCY = 8;
+const int PIN_BTN_EMERGENCY = 7;
+const int PIN_JOY_X = A1, PIN_JOY_Y = A2;
+const int DEADZONE = 50;
+
+LCD_I2C lcd(0x27, 16, 2);
+Motor motor(PIN_IN1, PIN_IN2);
+OneButton emergencyBtn(PIN_BTN_EMERGENCY, true);
+
+enum Etat { REST, MOVE, EMERGENCY };
+Etat state = REST;
+
+String activeLabel = "NON", positionLabel = "STATIONNAIRE";
+int xValue, yValue;
+unsigned long lastSpeedUpdate = 0;
 
 void setup() {
-  Serial.begin(9600);
-  lcd.begin();
-  lcd.backlight();
+    motor.begin();
+    lcd.begin();
+    lcd.backlight();
+    pinMode(PIN_LED_MOVE, OUTPUT);
+    pinMode(PIN_LED_EMERGENCY, OUTPUT);
 
-  pinMode(INPUT_1, OUTPUT);
-  pinMode(INPUT_2, OUTPUT);
-  pinMode(JOY_BTN, INPUT_PULLUP);  
-  buttonEmergency.setup(EMERG_BTN, INPUT_PULLUP, true);
-  buttonEmergency.attachClick(emergencyStop);
+    emergencyBtn.attachClick(toggleEmergency);
 }
-
-enum Etat{
-  READ,
-  MOVE,
-  FASTNSLOW,
-  EMERGENCY
-};
-Etat state = READ;
 
 void loop() {
-  buttonEmergency.tick();
+    emergencyBtn.tick();
 
-  readAnalog();
-  cloud9();
-}
+    switch (state) {
+        
+        case REST:
+            handleRestState();
+            break;
 
-void readAnalog(){
-  if(yValue > 512 + DEADZONE || yValue < 512 - DEADZONE) state = MOVE;
-  else if(xValue > 512 + DEADZONE || xValue < 512 - DEADZONE) state = FASTNSLOW;
-}
+        case MOVE:
+            handleMoveState();
+            break;
 
-void forwardBackward(){
-
-  yValue = analogRead(Y_PIN);
-  if(yValue > 512 + DEADZONE){
-    digitalWrite(INPUT_1, HIGH);
-    digitalWrite(INPUT_2, LOW);
-    digitalWrite(LED_1, HIGH);
-    active = "OUI";
-    Position = "AVANT";
-  }
-  else if(yValue < 512 - DEADZONE){
-    digitalWrite(INPUT_1, LOW);
-    digitalWrite(INPUT_2, HIGH);
-    digitalWrite(LED_1, HIGH);
-    active = "OUI"; 
-    postion = "ARRIÈRE";
-  }
-  else{
-    digitalWrite(INPUT_1, LOW);
-    digitalWrite(INPUT_2, LOW);
-    digitalWrite(LED_1, LOW);
-    active = "NON";
-    position = "CENTER";
-  }
-  screenPrinter();
-}
-
-void speedControl(){
-
-  static long lastMove = 0;
-  xValue = analogRead(X_PIN);
-  if(xValue > 512 + DEADZONE){
-    if(millis() - lastMove >= 10){
-      lastMove = millis();
-      if(val < 255){
-        val++;
-        analogWrite(INPUT_1, val);
-        analogWrite(INPUT_2, 0);
-        digitalWrite(LED_1, HIGH);
-        active = "OUI";
-        Position = "AVANT";
-      }
+        case EMERGENCY:
+            handleEmergencyState();
+            break;
     }
-  }
-  else if(xValue < 512 - DEADZONE){
-    if(millis() - lastMove >= 10){
-      lastMove = millis();
-      if(val > 0){
-        val--;
-        analogWrite(INPUT_1, 0);
-        analogWrite(INPUT_2, val);
-        digitalWrite(LED_1, HIGH);
-        active = "OUI";
-        Position = "ARRIÈRE";
-      }  
-    }
-  }
-  else{
-    digitalWrite(INPUT_1, LOW);
-    digitalWrite(INPUT_2, LOW);
-    digitalWrite(LED_1, LOW);
-    active = "NON";
-    Position = "CENTER";
-  }
-  screenPrinter();
 }
 
 
-void screenPrinter(){
-
-// On prépare les 3 lignes de texte dans un tableau
-  static long lastRefresh = 0;
-  String lignes[3];
-  lignes[0] = "Actif: " + active;
-  lignes[1] = "Sens: " + position;
-  lignes[2] = "Vitesse: " + String(val) + " %";
-
-  for (int i = 0; i < 3; i++) {
-    if(millis() - lastRefresh >= 2500){
-      lastRefresh = millis();
-      lcd.clear();
-      
-      // Affiche l'info actuelle sur la ligne du haut (0)
-      lcd.setCursor(0, 0);
-      lcd.print(lignes[i]);
-      
-      // Affiche l'info suivante sur la ligne du bas (1)
-      // Le "% 3" permet de revenir à la première info après la troisième
-      int next = (i + 1) % 3;
-      lcd.setCursor(0, 1);
-      lcd.print(lignes[next]);
-
-    }
-  }
+void handleRestState() {
+    motor.shutDown();
+    digitalWrite(PIN_LED_MOVE, LOW);
+    digitalWrite(PIN_LED_EMERGENCY, LOW);
+    activeLabel = "NON";
+    positionLabel = "STATIONNAIRE";
+    
+    checkJoystick(); 
+    updateDisplay();
 }
 
-void emergencyStop(){
-  static bool mustTurnOff = true;
+void handleMoveState() {
+    digitalWrite(PIN_LED_MOVE, HIGH);
+    digitalWrite(PIN_LED_EMERGENCY, LOW);
+    activeLabel = "OUI";
+    
+    controlMovement(); 
+    controlSpeed(); 
+    checkJoystick(); 
+    updateDisplay();
+}
 
-  if(mustTurnOff == true){
-    digitalWrite(INPUT_1, LOW);
-    digitalWrite(INPUT_2, LOW);
-    digitalWrite(LED_2, HIGH);
+void handleEmergencyState() {
+    motor.shutDown();
+    digitalWrite(PIN_LED_MOVE, LOW);
+    digitalWrite(PIN_LED_EMERGENCY, HIGH);
+    displayEmergencyAlert();
+}
+
+
+void checkJoystick() {
+    yValue = analogRead(PIN_JOY_Y);
+    
+    if (abs(yValue - 512) > DEADZONE) {
+        state = MOVE;
+    } else {
+        state = REST;
+    }
+}
+
+void controlMovement() {
+    if (yValue > 512 + DEADZONE) {
+        motor.moveForward();
+        positionLabel = "AVANT";
+    } else if (yValue < 512 - DEADZONE) {
+        motor.moveBackward();
+        positionLabel = "ARRIERE";
+    }
+}
+
+void controlSpeed() {
+    xValue = analogRead(PIN_JOY_X);
+    if (millis() - lastSpeedUpdate > 50) { 
+        if (xValue > 512 + DEADZONE) {
+            motor.increaseSpeed();
+            lastSpeedUpdate = millis();
+        } else if (xValue < 512 - DEADZONE) {
+            motor.decreaseSpeed();
+            lastSpeedUpdate = millis();
+        }
+    }
+}
+
+void toggleEmergency() {
+    lcd.clear();
+    if (state == EMERGENCY) {
+        state = REST;
+    } else {
+        state = EMERGENCY;
+    }
+}
+
+void displayEmergencyAlert() {
+    lcd.setCursor(0, 0);
     lcd.print(" !! URGENCE !!  ");
-    mustTurnOff = false;
-
-  }
-  else{
-    digitalWrite(LED_2, HIGH);
-    mustTurnOff = true;   
-    state = READ;
-  }
+    lcd.setCursor(0, 1);
+    lcd.print(" PRESS TO RESET ");
 }
 
-void cloud9(){
+void updateDisplay() {
+    static unsigned long lastRefresh = 0;
+    static int topIndex = 0;
+    
+    if (millis() - lastRefresh >= 2500) {
+        lastRefresh = millis();
+        lcd.clear();
+        
+        String lines[3];
+        lines[0] = "Actif: " + activeLabel;
+        lines[1] = "Sens: " + positionLabel;
+        lines[2] = "Vit: " + String(activeLabel == "OUI" ? motor.getSpeed() : 0);
 
-  switch(state){
-    case READ:
-      readAnalog();
-      break;
-    case MOVE:
-      forwardBackward();
-      break;
-    case FASTNSLOW:
-      speedControl();
-      break;
-    case EMERGENCY:
-      emergencyStop();
-      break;
-  }
+        lcd.setCursor(0, 0);
+        lcd.print(lines[topIndex]);
+        lcd.setCursor(0, 1);
+        lcd.print(lines[(topIndex + 1) % 3]);
+
+        topIndex = (topIndex + 1) % 3;
+    }
 }
