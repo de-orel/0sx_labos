@@ -3,7 +3,7 @@
 Motor::Motor(int p1, int p2) {
     this->pin1 = p1;
     this->pin2 = p2;
-    this->speedValue = 60; // Initial speed set to 60
+    this->speedValue = 60; 
 }
 
 void Motor::begin() {
