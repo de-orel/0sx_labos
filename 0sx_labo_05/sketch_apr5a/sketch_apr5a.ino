@@ -3,8 +3,8 @@
 #include "Moteur_dc.h"
 
 const int PIN_IN1 = 44, PIN_IN2 = 45;
-const int PIN_LED_MOVE = 9, PIN_LED_EMERGENCY = 8;
-const int PIN_BTN_EMERGENCY = 7;
+const int PIN_LED_MOVE = 6, PIN_LED_EMERGENCY = 5;
+const int PIN_BTN_EMERGENCY = 8;
 const int PIN_JOY_X = A1, PIN_JOY_Y = A2;
 const int DEADZONE = 50;
 
